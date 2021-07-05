@@ -5,8 +5,8 @@ use futures::{
 };
 use std::pin::Pin;
 
-type Error = Box<dyn std::error::Error + Send + Sync>;
-type BytesStream = Box<dyn Stream<Item = Result<Bytes, Error>> + Send + Sync + Unpin>;
+pub type Error = Box<dyn std::error::Error + Send + Sync>;
+pub type BytesStream = Box<dyn Stream<Item = Result<Bytes, Error>> + Send + Sync + Unpin>;
 pub struct ChunkStream {
     buf: BytesMut,
     cap: usize,
