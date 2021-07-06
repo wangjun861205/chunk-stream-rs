@@ -5,23 +5,29 @@ use futures::{
 };
 use std::pin::Pin;
 
-pub type Error = Box<dyn std::error::Error + Send + Sync>;
-pub type BytesStream = Box<dyn Stream<Item = Result<Bytes, Error>> + Send + Sync + Unpin>;
-pub struct ChunkStream {
+pub type BytesStream<E: std::error::Error + Send + Sync + 'static> =
+    Box<dyn Stream<Item = Result<Bytes, E>> + Send + Sync + Unpin>;
+pub struct ChunkStream<E>
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
     buf: BytesMut,
     cap: usize,
-    inner: BytesStream,
+    inner: BytesStream<E>,
 }
 
-impl ChunkStream {
-    pub fn new(stream: BytesStream) -> Self {
+impl<E> ChunkStream<E>
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    pub fn new(stream: BytesStream<E>) -> Self {
         Self {
             buf: BytesMut::with_capacity(8 * 1024),
             cap: 8 * 1024,
             inner: stream,
         }
     }
-    pub fn with_capacity(stream: BytesStream, size: usize) -> Self {
+    pub fn with_capacity(stream: BytesStream<E>, size: usize) -> Self {
         Self {
             buf: BytesMut::with_capacity(size),
             cap: size,
@@ -30,8 +36,11 @@ impl ChunkStream {
     }
 }
 
-impl Stream for ChunkStream {
-    type Item = Result<Bytes, Error>;
+impl<E> Stream for ChunkStream<E>
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    type Item = Result<Bytes, E>;
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let cap = self.cap;
         match self.inner.poll_next_unpin(cx) {
@@ -77,7 +86,7 @@ async fn test_chunk_stream() {
         }
         l.push(buf.freeze());
     }
-    let s = iter(l).map(|v| Ok::<Bytes, Error>(v));
+    let s = iter(l).map(|v| Ok::<Bytes, std::convert::Infallible>(v));
     let mut cs = ChunkStream::with_capacity(Box::new(s), 100);
     while let Some(Ok(bs)) = cs.next().await {
         println!("{}", bs.len());
